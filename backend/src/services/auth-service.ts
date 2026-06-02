@@ -11,20 +11,11 @@ export async function registerUser(username: string, password: string): Promise<
   }
 
   const passwordHash: string = await bcrypt.hash(password, 10);
-
   const user = await prisma.user.create({
-    data: {
-      username,
-      passwordHash,
-      role: 'user',
-    },
+    data: { username, passwordHash, role: 'user' },
   });
 
-  const token: string = generateToken({
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-  });
+  const token: string = generateToken({ userId: user.id, username: user.username, role: user.role });
 
   return {
     userId: user.id,
@@ -38,24 +29,13 @@ export async function registerUser(username: string, password: string): Promise<
 
 export async function loginUser(username: string, password: string): Promise<any> {
   const user = await prisma.user.findUnique({ where: { username } });
-  if (!user) {
-    throw new Error('Неверное имя пользователя или пароль');
-  }
-
-  if (!user.isActive) {
-    throw new Error('Аккаунт заблокирован');
-  }
+  if (!user) throw new Error('Неверное имя пользователя или пароль');
+  if (!user.isActive) throw new Error('Аккаунт заблокирован');
 
   const isPasswordValid: boolean = await bcrypt.compare(password, user.passwordHash);
-  if (!isPasswordValid) {
-    throw new Error('Неверное имя пользователя или пароль');
-  }
+  if (!isPasswordValid) throw new Error('Неверное имя пользователя или пароль');
 
-  const token: string = generateToken({
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-  });
+  const token: string = generateToken({ userId: user.id, username: user.username, role: user.role });
 
   return {
     userId: user.id,

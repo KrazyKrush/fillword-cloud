@@ -11,11 +11,11 @@ export async function getPublishedFillwords(params: {
 }): Promise<any> {
   const where: any = { status: 'published' };
 
-  if (params.topic) {
-    where.topic = { contains: params.topic, mode: 'insensitive' };
+  if (params.topic && params.topic.trim()) {
+    where.topic = { contains: params.topic.trim(), mode: 'insensitive' };
   }
-  if (params.difficulty) {
-    where.difficulty = params.difficulty;
+  if (params.difficulty && params.difficulty.trim()) {
+    where.difficulty = params.difficulty.trim();
   }
 
   const [content, totalElements] = await Promise.all([
@@ -167,6 +167,112 @@ export async function createFillword(
   };
 }
 
+export async function updateFillword(
+  fillwordId: number,
+  userId: number,
+  data: {
+    title?: string;
+    topic?: string;
+    width?: number;
+    height?: number;
+    words?: string[];
+  }
+): Promise<any> {
+  const fillword = await prisma.fillword.findUnique({ where: { id: fillwordId } });
+
+  if (!fillword) throw new Error('Филворд не найден');
+  if (fillword.creatorId !== userId) throw new Error('Вы не являетесь автором этого филворда');
+
+  // Если слова переданы, генерируем новую сетку
+  if (data.words && data.words.length >= 5) {
+    const width = data.width || fillword.width;
+    const height = data.height || fillword.height;
+    const result = generateFillword(width, height, data.words);
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    const difficulty = calculateDifficulty(width, height, result.placedWords.length);
+
+    // Удаляем старые ячейки и слова
+    await prisma.gridCell.deleteMany({ where: { fillwordId } });
+    await prisma.word.deleteMany({ where: { fillwordId } });
+
+    const updated = await prisma.fillword.update({
+      where: { id: fillwordId },
+      data: {
+        title: data.title || fillword.title,
+        topic: data.topic || fillword.topic,
+        width,
+        height,
+        difficulty,
+        status: 'pending', // Обратно на модерацию
+        rejectionReason: null,
+        totalWordsCount: result.placedWords.length,
+        isAiGenerated: data.isAiGenerated || fillword.isAiGenerated,
+        cells: {
+          create: result.grid.flatMap((row: string[], r: number) =>
+            row.map((letter: string, c: number) => ({
+              row: r,
+              col: c,
+              letter,
+            }))
+          ),
+        },
+        words: {
+          create: result.placedWords.map((w: any) => ({
+            word: w.word,
+            direction: w.direction,
+            startRow: w.startRow,
+            startCol: w.startCol,
+            endRow: w.endRow,
+            endCol: w.endCol,
+          })),
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      title: updated.title,
+      status: updated.status,
+      message: 'Филворд обновлён и отправлен на повторную модерацию',
+    };
+  }
+
+  // Если слова не переданы, обновляем только метаданные
+  const updated = await prisma.fillword.update({
+    where: { id: fillwordId },
+    data: {
+      title: data.title || fillword.title,
+      topic: data.topic || fillword.topic,
+      status: 'pending',
+      rejectionReason: null,
+    },
+  });
+
+  return {
+    id: updated.id,
+    title: updated.title,
+    status: updated.status,
+    message: 'Филворд обновлён и отправлен на повторную модерацию',
+  };
+}
+
+export async function deleteFillword(fillwordId: number, userId: number, isAdmin: boolean = false): Promise<any> {
+  const fillword = await prisma.fillword.findUnique({ where: { id: fillwordId } });
+  if (!fillword) throw new Error('Филворд не найден');
+
+  // Админ может удалить любой филворд
+  if (!isAdmin && fillword.creatorId !== userId) {
+    throw new Error('У вас нет прав на удаление этого филворда');
+  }
+
+  await prisma.fillword.delete({ where: { id: fillwordId } });
+  return { message: 'Филворд успешно удалён' };
+}
+
 export async function getUserFillwords(
   userId: number,
   status?: string,
@@ -174,8 +280,8 @@ export async function getUserFillwords(
   size: number = 20
 ): Promise<any> {
   const where: any = { creatorId: userId };
-  if (status) {
-    where.status = status;
+  if (status && status.trim()) {
+    where.status = status.trim();
   }
 
   const [content, totalElements] = await Promise.all([
