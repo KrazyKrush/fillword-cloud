@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  username      String    @unique
+  passwordHash  String
+  role          String    @default("user")
+  isActive      Boolean   @default(true)
+  registeredAt  DateTime  @default(now())
+  lastLoginAt   DateTime?
+
+  createdFillwords    Fillword[]    @relation("CreatedFillwords")
+  moderatedFillwords  Fillword[]    @relation("ModeratedFillwords")
+  solveResults        SolveResult[]
+  achievements        Achievement[]
+  stopListEntries     StopList[]
+}
+
+model Fillword {
+  id               Int       @id @default(autoincrement())
+  creatorId        Int
+  moderatorId      Int?
+  title            String
+  topic            String
+  width            Int
+  height           Int
+  difficulty       String    @default("easy")
+  status           String    @default("pending")
+  rejectionReason  String?
+  isAiGenerated    Boolean   @default(false)
+  totalWordsCount  Int
+  createdAt        DateTime  @default(now())
+  moderatedAt      DateTime?
+  publishedAt      DateTime?
+  viewsCount       Int       @default(0)
+
+  creator      User          @relation("CreatedFillwords", fields: [creatorId], references: [id])
+  moderator    User?         @relation("ModeratedFillwords", fields: [moderatorId], references: [id])
+  cells        GridCell[]
+  words        Word[]
+  solveResults SolveResult[]
+}
+
+model GridCell {
+  id         Int      @id @default(autoincrement())
+  fillwordId Int
+  row        Int
+  col        Int
+  letter     String
+  fillword   Fillword @relation(fields: [fillwordId], references: [id], onDelete: Cascade)
+
+  @@unique([fillwordId, row, col])
+}
+
+model Word {
+  id         Int      @id @default(autoincrement())
+  fillwordId Int
+  word       String
+  direction  String
+  startRow   Int
+  startCol   Int
+  endRow     Int
+  endCol     Int
+  fillword   Fillword @relation(fields: [fillwordId], references: [id], onDelete: Cascade)
+}
+
+model SolveResult {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  fillwordId      Int
+  timeSeconds     Int       @default(0)
+  errorsCount     Int       @default(0)
+  wordsFoundCount Int       @default(0)
+  isCompleted     Boolean   @default(false)
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  user     User     @relation(fields: [userId], references: [id])
+  fillword Fillword @relation(fields: [fillwordId], references: [id])
+
+  @@unique([userId, fillwordId])
+}
+
+model Achievement {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  code        String
+  name        String
+  description String
+  unlockedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, code])
+}
+
+model StopList {
+  id        Int      @id @default(autoincrement())
+  word      String   @unique
+  category  String   @default("other")
+  addedById Int?
+  createdAt DateTime @default(now())
+
+  addedBy User? @relation(fields: [addedById], references: [id])
+}
