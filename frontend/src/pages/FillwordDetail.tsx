@@ -5,8 +5,51 @@ import FillwordGrid from '../components/FillwordGrid'
 import Timer from '../components/Timer'
 import WordList from '../components/WordList'
 import DifficultyBadge from '../components/DifficultyBadge'
-import { FillwordDetail as FillwordDetailType, SolveSession, CheckWordResponse } from '../types'
 import client from '../api/client'
+
+interface FillwordWord {
+  id: number
+  word: string
+  direction: string
+  startRow: number
+  startCol: number
+  endRow: number
+  endCol: number
+}
+
+interface FillwordDetailType {
+  id: number
+  title: string
+  topic: string
+  difficulty: string
+  status: string
+  width: number
+  height: number
+  grid: string[][]
+  words: FillwordWord[]
+  creatorUsername: string
+  rejectionReason: string | null
+  totalWordsCount: number
+  createdAt: string
+}
+
+interface SolveSession {
+  resultId: number | string
+  fillwordId: number
+  startedAt: string
+  totalWordsCount: number
+  isCompleted: boolean
+}
+
+interface CheckWordResponse {
+  isCorrect: boolean
+  wordFound?: string
+  wordsFoundCount: number
+  totalWordsCount: number
+  isCompleted: boolean
+  timeSeconds: number
+  errorsCount: number
+}
 
 export default function FillwordDetail() {
   const { id } = useParams<{ id: string }>()
@@ -15,14 +58,14 @@ export default function FillwordDetail() {
   const [session, setSession] = useState<SolveSession | null>(null)
   const [foundWords, setFoundWords] = useState<string[]>([])
   const [foundCells, setFoundCells] = useState<Set<string>>(new Set())
-  const [errors, setErrors] = useState(0)
-  const [completed, setCompleted] = useState(false)
-  const [finalTime, setFinalTime] = useState(0)
+  const [errors, setErrors] = useState<number>(0)
+  const [completed, setCompleted] = useState<boolean>(false)
+  const [finalTime, setFinalTime] = useState<number>(0)
   const [mode, setMode] = useState<'view' | 'solve'>('view')
-  const [showCongrats, setShowCongrats] = useState(false)
-  const [showEarlyStop, setShowEarlyStop] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [isReplay, setIsReplay] = useState(false)
+  const [showCongrats, setShowCongrats] = useState<boolean>(false)
+  const [showEarlyStop, setShowEarlyStop] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [isReplay, setIsReplay] = useState<boolean>(false)
 
   useEffect(() => {
     if (!id) return
@@ -37,7 +80,7 @@ export default function FillwordDetail() {
     setIsReplay(false)
 
     client.get(`/fillwords/${id}`)
-      .then(({ data }: { data: FillwordDetailType }) => setFillword(data))
+      .then((res: any) => setFillword(res.data))
       .catch(() => alert('Не удалось загрузить филворд'))
       .finally(() => setLoading(false))
   }, [id])
@@ -52,7 +95,8 @@ export default function FillwordDetail() {
   const startSolve = async (replay: boolean = false) => {
     if (!id) return
     try {
-      const { data }: { data: SolveSession } = await client.post(`/solve/${id}/start`)
+      const res = await client.post(`/solve/${id}/start`)
+      const data: SolveSession = res.data
       setSession(data)
       setMode('solve')
       setFoundWords([])
@@ -71,7 +115,7 @@ export default function FillwordDetail() {
   }
 
   const earlyStop = () => {
-    const timeSeconds = session
+    const timeSeconds: number = session
       ? Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000)
       : 0
     setFinalTime(timeSeconds)
@@ -80,24 +124,22 @@ export default function FillwordDetail() {
 
   const handleWordSelect = useCallback(async (cells: { row: number; col: number }[]) => {
     if (!session || !fillword) return
-    if (completed && !isReplay) return
 
-    const word: string = cells.map(c => fillword.grid[c.row][c.col] || '').join('')
+    const word: string = cells.map((c: { row: number; col: number }) => fillword.grid[c.row][c.col] || '').join('')
     try {
-      const { data }: { data: CheckWordResponse } = await client.post(
-        `/solve/${session.resultId}/check-word`,
-        { word, cells, isReplay }
-      )
-      setErrors(data.errorsCount)
+      const res = await client.post(`/solve/${session.resultId}/check-word`, { word, cells })
+      const data: CheckWordResponse = res.data
+
+      setErrors(Number(data.errorsCount))
       if (data.isCorrect && data.wordFound) {
-        setFoundWords(prev => [...prev, data.wordFound!])
+        setFoundWords((prev: string[]) => [...prev, data.wordFound!])
         const newFoundCells = new Set(foundCells)
-        cells.forEach(c => newFoundCells.add(`${c.row}-${c.col}`))
+        cells.forEach((c: { row: number; col: number }) => newFoundCells.add(`${c.row}-${c.col}`))
         setFoundCells(newFoundCells)
       }
       if (data.isCompleted) {
         setCompleted(true)
-        setFinalTime(data.timeSeconds)
+        setFinalTime(Number(data.timeSeconds))
         setShowCongrats(true)
       }
     } catch (e: any) {
@@ -127,7 +169,7 @@ export default function FillwordDetail() {
     )
   }
 
-  const allWords: string[] = fillword.words.map(w => w.word)
+  const allWords: string[] = fillword.words.map((w: FillwordWord) => w.word)
 
   return (
     <div className="max-w-5xl mx-auto">
