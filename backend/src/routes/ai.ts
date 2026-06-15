@@ -6,6 +6,17 @@ import { generateWords, checkAiStatus } from '../services/gigachat-service';
 
 const router: Router = Router();
 
+// Публичный маршрут — без авторизации
+router.get('/status', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const status = await checkAiStatus();
+    res.json(status);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Всё что ниже — требует авторизации
 router.use(authenticate);
 router.use(requireRole('user', 'admin'));
 
@@ -26,15 +37,6 @@ router.post('/generate-words', async (req: Request, res: Response): Promise<void
     } else {
       res.status(500).json({ error: error.message });
     }
-  }
-});
-
-router.get('/status', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const status = await checkAiStatus();
-    res.json(status);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
   }
 });
 

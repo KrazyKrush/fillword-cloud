@@ -21,6 +21,7 @@ CREATE TABLE "Fillword" (
     "difficulty" TEXT NOT NULL DEFAULT 'easy',
     "status" TEXT NOT NULL DEFAULT 'pending',
     "rejectionReason" TEXT,
+    "deletedReason" TEXT,
     "isAiGenerated" BOOLEAN NOT NULL DEFAULT false,
     "totalWordsCount" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -55,6 +56,16 @@ CREATE TABLE "Word" (
 );
 
 -- CreateTable
+CREATE TABLE "WordPath" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "wordId" INTEGER NOT NULL,
+    "step" INTEGER NOT NULL,
+    "row" INTEGER NOT NULL,
+    "col" INTEGER NOT NULL,
+    CONSTRAINT "WordPath_wordId_fkey" FOREIGN KEY ("wordId") REFERENCES "Word" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "SolveResult" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "userId" INTEGER NOT NULL,
@@ -66,7 +77,7 @@ CREATE TABLE "SolveResult" (
     "startedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "completedAt" DATETIME,
     CONSTRAINT "SolveResult_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "SolveResult_fillwordId_fkey" FOREIGN KEY ("fillwordId") REFERENCES "Fillword" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "SolveResult_fillwordId_fkey" FOREIGN KEY ("fillwordId") REFERENCES "Fillword" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -95,6 +106,9 @@ CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "GridCell_fillwordId_row_col_key" ON "GridCell"("fillwordId", "row", "col");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "WordPath_wordId_step_key" ON "WordPath"("wordId", "step");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SolveResult_userId_fillwordId_key" ON "SolveResult"("userId", "fillwordId");

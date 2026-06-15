@@ -7,18 +7,16 @@ const client = axios.create({
 
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 
+// НЕ ДЕЛАЕМ АВТОРЕДИРЕКТ — каждая страница сама решает
 client.interceptors.response.use(
-  (r) => r,
+  (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-    }
     return Promise.reject(error)
   }
 )

@@ -1,6 +1,13 @@
 import { Router, Request, Response } from 'express';
-import { registerUser, loginUser } from '../services/auth-service';
+import {
+  registerUser,
+  loginUser,
+  getUserProfile,
+  getAllUsers,
+  toggleUserBlock,
+} from '../services/auth-service';
 import { authenticate } from '../middleware/auth';
+import { requireRole } from '../middleware/role';
 import { registerSchema, loginSchema } from '../utils/validators';
 
 const router: Router = Router();
@@ -36,5 +43,47 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 router.post('/logout', authenticate, async (req: Request, res: Response): Promise<void> => {
   res.json({ message: 'Выход выполнен успешно' });
 });
+
+router.get('/profile', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const profile = await getUserProfile(req.user!.userId);
+    res.json(profile);
+  } catch (error: any) {
+    res.status(404).json({ error: error.message });
+  }
+});
+
+router.get(
+  '/users',
+  authenticate,
+  requireRole('admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { page = '1', size = '20' } = req.query;
+      const result = await getAllUsers(
+        parseInt(page as string) || 1,
+        parseInt(size as string) || 20
+      );
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+router.put(
+  '/users/:id/block',
+  authenticate,
+  requireRole('admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { isActive } = req.body;
+      const result = await toggleUserBlock(parseInt(req.params.id), isActive);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
 
 export default router;

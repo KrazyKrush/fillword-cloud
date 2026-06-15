@@ -7,37 +7,69 @@ export interface PlacedWord {
   startCol: number;
   endRow: number;
   endCol: number;
+  path?: Array<{ row: number; col: number }>;
 }
 
 export function randomChar(): string {
   return CYRILLIC[Math.floor(Math.random() * CYRILLIC.length)];
 }
 
+// Все возможные типы дорожек
 export function getDirections(difficulty: string): string[] {
-  switch (difficulty) {
-    case 'easy': return ['H', 'V'];
-    case 'medium': return ['H', 'V', 'D'];
-    case 'hard': return ['H', 'V', 'D', 'HR', 'VR', 'DR'];
-    default: return ['H', 'V'];
-  }
+  const base = ['H', 'V', 'D', 'HR', 'VR', 'DR'];
+  if (difficulty === 'easy') return [...base, 'ZH', 'ZV'];
+  if (difficulty === 'medium') return [...base, 'ZH', 'ZV'];
+  return [...base, 'ZH', 'ZV'];
 }
 
-export function getEndPosition(
+// ZH = горизонтальная змейка (→↓→↓→↓)
+// ZV = вертикальная змейка (↓→↓→↓→)
+
+function buildSnakePath(
+  word: string,
   startRow: number,
   startCol: number,
-  word: string,
-  direction: string
-): [number, number] {
-  const len: number = word.length - 1;
-  switch (direction) {
-    case 'H': return [startRow, startCol + len];
-    case 'HR': return [startRow, startCol - len];
-    case 'V': return [startRow + len, startCol];
-    case 'VR': return [startRow - len, startCol];
-    case 'D': return [startRow + len, startCol + len];
-    case 'DR': return [startRow - len, startCol - len];
-    default: return [startRow, startCol + len];
+  type: 'ZH' | 'ZV',
+  height: number,
+  width: number
+): Array<{ row: number; col: number }> | null {
+  const path: Array<{ row: number; col: number }> = [{ row: startRow, col: startCol }];
+  let row = startRow;
+  let col = startCol;
+
+  for (let i = 1; i < word.length; i++) {
+    let nextRow = row;
+    let nextCol = col;
+
+    if (type === 'ZH') {
+      // Нечётный шаг →, чётный шаг ↓
+      if (i % 2 === 1) nextCol = col + 1;
+      else nextRow = row + 1;
+    } else {
+      // Нечётный шаг ↓, чётный шаг →
+      if (i % 2 === 1) nextRow = row + 1;
+      else nextCol = col + 1;
+    }
+
+    if (nextRow < 0 || nextRow >= height || nextCol < 0 || nextCol >= width) return null;
+    path.push({ row: nextRow, col: nextCol });
+    row = nextRow;
+    col = nextCol;
   }
+
+  return path;
+}
+
+function isSnakePathValid(
+  grid: (string | null)[][],
+  word: string,
+  path: Array<{ row: number; col: number }>
+): boolean {
+  for (let i = 0; i < word.length; i++) {
+    const { row, col } = path[i];
+    if (grid[row][col] !== null && grid[row][col] !== word[i]) return false;
+  }
+  return true;
 }
 
 export function canPlaceWord(
@@ -47,18 +79,23 @@ export function canPlaceWord(
   startCol: number,
   direction: string
 ): boolean {
-  let row: number = startRow;
-  let col: number = startCol;
-  const height: number = grid.length;
-  const width: number = grid[0].length;
+  const height = grid.length;
+  const width = grid[0].length;
 
-  for (let i: number = 0; i < word.length; i++) {
-    if (row < 0 || row >= height || col < 0 || col >= width) {
-      return false;
-    }
-    if (grid[row][col] !== null && grid[row][col] !== word[i]) {
-      return false;
-    }
+  // Змейки
+  if (direction === 'ZH' || direction === 'ZV') {
+    const path = buildSnakePath(word, startRow, startCol, direction as 'ZH' | 'ZV', height, width);
+    if (!path) return false;
+    return isSnakePathValid(grid, word, path);
+  }
+
+  // Прямые
+  let row = startRow;
+  let col = startCol;
+
+  for (let i = 0; i < word.length; i++) {
+    if (row < 0 || row >= height || col < 0 || col >= width) return false;
+    if (grid[row][col] !== null && grid[row][col] !== word[i]) return false;
     switch (direction) {
       case 'H': col++; break;
       case 'HR': col--; break;
@@ -77,12 +114,35 @@ export function placeWordOnGrid(
   startRow: number,
   startCol: number,
   direction: string
-): void {
-  let row: number = startRow;
-  let col: number = startCol;
+): Array<{ row: number; col: number }> {
+  const height = grid.length;
+  const width = grid[0].length;
 
-  for (let i: number = 0; i < word.length; i++) {
-    grid[row][col] = word[i];
+  // Змейки
+  if (direction === 'ZH' || direction === 'ZV') {
+    const path = buildSnakePath(word, startRow, startCol, direction as 'ZH' | 'ZV', height, width);
+    if (path) {
+      for (let i = 0; i < word.length; i++) {
+        const { row, col } = path[i];
+        if (grid[row][col] === null) {
+          grid[row][col] = word[i];
+        }
+      }
+      return path;
+    }
+    return [];
+  }
+
+  // Прямые
+  const path: Array<{ row: number; col: number }> = [];
+  let row = startRow;
+  let col = startCol;
+
+  for (let i = 0; i < word.length; i++) {
+    if (grid[row][col] === null) {
+      grid[row][col] = word[i];
+    }
+    path.push({ row, col });
     switch (direction) {
       case 'H': col++; break;
       case 'HR': col--; break;
@@ -92,16 +152,44 @@ export function placeWordOnGrid(
       case 'DR': row--; col--; break;
     }
   }
+  return path;
 }
 
-export function calculateDifficulty(
-  width: number,
-  height: number,
-  wordCount: number
-): string {
+export function calculateDifficulty(width: number, height: number, wordCount: number): string {
   if (width <= 10 && height <= 10 && wordCount <= 7) return 'easy';
   if (width <= 15 && height <= 15 && wordCount <= 12) return 'medium';
   return 'hard';
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Проверка: можно ли разместить слово с учётом уже размещённых?
+function wouldBreakExisting(
+  grid: (string | null)[][],
+  word: string,
+  startRow: number,
+  startCol: number,
+  direction: string,
+  placedWords: PlacedWord[]
+): boolean {
+  // Создаём копию сетки и пробуем разместить
+  const gridCopy: (string | null)[][] = grid.map(row => [...row]);
+  placeWordOnGrid(gridCopy, word, startRow, startCol, direction);
+
+  // Проверяем, что все уже размещённые слова всё ещё читаются
+  for (const pw of placedWords) {
+    if (!canPlaceWord(gridCopy, pw.word, pw.startRow, pw.startCol, pw.direction)) {
+      return true; // сломали существующее слово
+    }
+  }
+  return false;
 }
 
 export function generateFillword(
@@ -109,48 +197,67 @@ export function generateFillword(
   height: number,
   words: string[]
 ): { grid: string[][]; placedWords: PlacedWord[]; error?: string } {
-  const upperWords: string[] = words.map((w: string) => w.toUpperCase().trim());
-  const sortedWords: string[] = [...upperWords].sort((a: string, b: string) => b.length - a.length);
+  const upperWords: string[] = words.map(w => w.toUpperCase().trim());
+  const sortedWords: string[] = [...upperWords].sort((a, b) => b.length - a.length);
   const difficulty: string = calculateDifficulty(width, height, sortedWords.length);
   const directions: string[] = getDirections(difficulty);
 
-  const grid: (string | null)[][] = Array.from(
-    { length: height },
-    () => Array(width).fill(null)
-  );
-
+  const grid: (string | null)[][] = Array.from({ length: height }, () => Array(width).fill(null));
   const placedWords: PlacedWord[] = [];
+  const usedDirections: Record<string, number> = {};
 
   for (const word of sortedWords) {
-    let placed: boolean = false;
-    const shuffledDirections: string[] = [...directions].sort(() => Math.random() - 0.5);
+    let placed = false;
 
-    for (const dir of shuffledDirections) {
-      const positions: [number, number][] = [];
-      for (let r: number = 0; r < height; r++) {
-        for (let c: number = 0; c < width; c++) {
-          positions.push([r, c]);
+    // Все возможные позиции
+    const allPositions: Array<{ row: number; col: number; dir: string }> = [];
+    for (let r = 0; r < height; r++) {
+      for (let c = 0; c < width; c++) {
+        for (const dir of directions) {
+          if (canPlaceWord(grid, word, r, c, dir)) {
+            allPositions.push({ row: r, col: c, dir });
+          }
         }
       }
-      positions.sort(() => Math.random() - 0.5);
+    }
 
-      for (const [r, c] of positions) {
-        if (canPlaceWord(grid, word, r, c, dir)) {
-          placeWordOnGrid(grid, word, r, c, dir);
-          const [endRow, endCol] = getEndPosition(r, c, word, dir);
-          placedWords.push({
-            word,
-            direction: dir,
-            startRow: r,
-            startCol: c,
-            endRow,
-            endCol,
-          });
-          placed = true;
-          break;
-        }
+    // Перемешиваем
+    const shuffled = shuffle(allPositions);
+
+    // Сортируем: предпочитаем неиспользованные направления и пересечения
+    shuffled.sort((a, b) => {
+      const aUsed = usedDirections[a.dir] || 0;
+      const bUsed = usedDirections[b.dir] || 0;
+      if (aUsed !== bUsed) return aUsed - bUsed;
+
+      // Предпочитаем змейки
+      const aSnake = a.dir.startsWith('Z') ? 0 : 1;
+      const bSnake = b.dir.startsWith('Z') ? 0 : 1;
+      return aSnake - bSnake;
+    });
+
+    for (const pos of shuffled) {
+      // Проверяем, не сломает ли это размещение другие слова
+      if (wouldBreakExisting(grid, word, pos.row, pos.col, pos.dir, placedWords)) {
+        continue;
       }
-      if (placed) break;
+
+      if (canPlaceWord(grid, word, pos.row, pos.col, pos.dir)) {
+        const path = placeWordOnGrid(grid, word, pos.row, pos.col, pos.dir);
+        const last = path[path.length - 1];
+        placedWords.push({
+          word,
+          direction: pos.dir,
+          startRow: pos.row,
+          startCol: pos.col,
+          endRow: last.row,
+          endCol: last.col,
+          path,
+        });
+        usedDirections[pos.dir] = (usedDirections[pos.dir] || 0) + 1;
+        placed = true;
+        break;
+      }
     }
 
     if (!placed) {
@@ -162,9 +269,7 @@ export function generateFillword(
     }
   }
 
-  const finalGrid: string[][] = grid.map((row: (string | null)[]) =>
-    row.map((cell: string | null) => cell || randomChar())
-  );
-
+  // Заполняем пустые ячейки
+  const finalGrid: string[][] = grid.map(row => row.map(cell => cell || randomChar()));
   return { grid: finalGrid, placedWords };
 }

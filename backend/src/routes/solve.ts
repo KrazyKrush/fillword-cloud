@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { optionalAuth } from '../middleware/auth';
 import { checkWordSchema } from '../utils/validators';
-import { startSolve, checkWord, getLeaderboard } from '../services/solve-service';
+import * as solveService from '../services/solve-service';
 
 const router: Router = Router();
 
@@ -11,7 +11,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const userId: number = req.user?.userId || 0;
-      const result = await startSolve(userId, parseInt(req.params.fillwordId));
+      const result = await solveService.startSolve(userId, parseInt(req.params.fillwordId));
       res.status(201).json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -25,7 +25,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const data = checkWordSchema.parse(req.body);
-      const result = await checkWord(parseInt(req.params.resultId), data.word, data.cells);
+      const result = await solveService.checkWord(parseInt(req.params.resultId), data.word, data.cells);
       res.json(result);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -41,7 +41,7 @@ router.get(
   '/leaderboard/:fillwordId',
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const result = await getLeaderboard(parseInt(req.params.fillwordId));
+      const result = await solveService.getLeaderboard(parseInt(req.params.fillwordId));
       res.json(result);
     } catch (error: any) {
       res.status(404).json({ error: error.message });

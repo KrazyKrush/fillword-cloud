@@ -5,7 +5,9 @@ import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
 import Catalog from './pages/Catalog'
 import FillwordDetail from './pages/FillwordDetail'
+import FillwordPDF from './pages/FillwordPDF'
 import CreateFillword from './pages/CreateFillword'
+import EditFillword from './pages/EditFillword'
 import Profile from './pages/Profile'
 import Moderation from './pages/Moderation'
 import Login from './pages/Login'
@@ -22,6 +24,8 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Catalog />} />
               <Route path="/fillword/:id" element={<FillwordDetail />} />
+              <Route path="/fillword/:id/pdf" element={<FillwordPDF />} />
+              <Route path="/fillword/:id/edit" element={<ProtectedRoute roles={['user', 'admin']}><EditFillword /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute roles={['user', 'admin']}><CreateFillword /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute roles={['user', 'admin']}><Profile /></ProtectedRoute>} />
               <Route path="/moderation" element={<ProtectedRoute roles={['admin']}><Moderation /></ProtectedRoute>} />
