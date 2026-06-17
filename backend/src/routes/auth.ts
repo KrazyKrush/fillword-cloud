@@ -86,4 +86,39 @@ router.put(
   }
 );
 
+// Запрет публикации (mute)
+router.put(
+  '/users/:id/mute',
+  authenticate,
+  requireRole('admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { minutes, reason } = req.body;
+      if (!minutes || !reason) {
+        res.status(400).json({ error: 'Укажите минуты и причину' });
+        return;
+      }
+      const result = await muteUser(parseInt(req.params.id), minutes, reason, req.user!.userId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
+
+// Снятие запрета публикации
+router.put(
+  '/users/:id/unmute',
+  authenticate,
+  requireRole('admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const result = await unmuteUser(parseInt(req.params.id));
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
+
 export default router;

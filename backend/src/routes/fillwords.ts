@@ -76,6 +76,12 @@ router.post(
   requireRole('user', 'admin'),
   async (req: Request, res: Response): Promise<void> => {
     try {
+      const profile = await getUserProfile(req.user!.userId);
+      if (profile.muteMessage) {
+        res.status(403).json({ error: profile.muteMessage });
+        return;
+      }
+
       const data = createFillwordSchema.parse(req.body);
       const result = await createFillword(req.user!.userId, data);
       res.status(201).json(result);
