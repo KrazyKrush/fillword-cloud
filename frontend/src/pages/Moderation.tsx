@@ -2,19 +2,53 @@ import { useState, useEffect } from 'react'
 import { Eye, Trash2, Shield, Ban, CheckCircle, Clock } from 'lucide-react'
 import ModerationModal from '../components/ModerationModal'
 import Pagination from '../components/Pagination'
-import { ModerationQueueItem, ModerationQueueResponse, FillwordCard, PaginatedResponse } from '../types'
 import client from '../api/client'
+
+interface ModerationQueueItem {
+  id: number
+  title: string
+  topic: string
+  difficulty: string
+  creatorUsername: string
+  totalWordsCount: number
+  createdAt: string
+}
+
+interface ModerationQueueResponse {
+  content: ModerationQueueItem[]
+  totalInQueue: number
+  totalPages: number
+  currentPage: number
+}
+
+interface FillwordCard {
+  id: number
+  title: string
+  topic: string
+  difficulty: string
+  creatorUsername: string
+  viewsCount: number
+  createdAt: string
+}
 
 interface UserItem {
   id: number
   username: string
   role: string
   isActive: boolean
+  blockReason: string | null
   muteUntil: string | null
   muteReason: string | null
   lockedUntil: string | null
   totalCreated: number
   totalSolved: number
+}
+
+interface PaginatedResponse<T> {
+  content: T[]
+  totalPages: number
+  totalElements: number
+  currentPage: number
 }
 
 export default function Moderation() {
@@ -31,6 +65,8 @@ export default function Moderation() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'queue' | 'published' | 'users'>('queue')
+
+  // Удаление филворда
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [deleteReason, setDeleteReason] = useState('')
   const [deleteTitle, setDeleteTitle] = useState('')
@@ -50,7 +86,8 @@ export default function Moderation() {
   const fetchQueue = () => {
     setLoading(true)
     client.get('/moderation/queue', { params: { page, size: 20 } })
-      .then(({ data }: { data: ModerationQueueResponse }) => {
+      .then((res: any) => {
+        const data: ModerationQueueResponse = res.data
         setQueue(data.content)
         setTotalPages(data.totalPages)
         setTotalInQueue(data.totalInQueue)
@@ -62,7 +99,8 @@ export default function Moderation() {
   const fetchPublished = () => {
     setLoading(true)
     client.get('/moderation/published', { params: { page: pubPage, size: 20 } })
-      .then(({ data }: { data: PaginatedResponse<FillwordCard> }) => {
+      .then((res: any) => {
+        const data: PaginatedResponse<FillwordCard> = res.data
         setPublished(data.content)
         setPubTotalPages(data.totalPages)
       })
@@ -73,7 +111,8 @@ export default function Moderation() {
   const fetchUsers = () => {
     setLoading(true)
     client.get('/auth/users', { params: { page: userPage, size: 20 } })
-      .then(({ data }: { data: PaginatedResponse<UserItem> }) => {
+      .then((res: any) => {
+        const data: PaginatedResponse<UserItem> = res.data
         setUsers(data.content)
         setUserTotalPages(data.totalPages)
       })
@@ -87,21 +126,19 @@ export default function Moderation() {
     else fetchUsers()
   }, [page, pubPage, userPage, tab])
 
-  // Удаление филворда
   const handleDelete = async () => {
     if (!deleteId || !deleteReason.trim()) return
     try {
-      await client.put(`/moderation/published/${deleteId}/delete`, { reason: deleteReason })
+      await client.put(`/moderation/published/${deleteId}/delete`, { reason: deleteReason.trim() })
       setDeleteId(null)
       setDeleteReason('')
       setDeleteTitle('')
       fetchPublished()
     } catch (e: any) {
-      alert(e.response?.data?.error || 'Ошибка удаления')
+      alert(e.response?.data?.error || 'Ошибка')
     }
   }
 
-  // Блокировка
   const handleBlockClick = (userId: number, username: string, currentStatus: boolean) => {
     setBlockUserId(userId)
     setBlockUsername(username)
@@ -111,17 +148,14 @@ export default function Moderation() {
 
   const confirmBlock = async () => {
     if (!blockUserId) return
-    const isActive = blockAction === 'unblock'
-
     if (blockAction === 'block' && !blockReason.trim()) {
       alert('Укажите причину блокировки')
       return
     }
-
     try {
       await client.put(`/auth/users/${blockUserId}/block`, {
-        isActive,
-        reason: blockReason || undefined,
+        isActive: blockAction === 'unblock',
+        reason: blockReason.trim() || undefined,
       })
       setBlockUserId(null)
       fetchUsers()
@@ -130,7 +164,6 @@ export default function Moderation() {
     }
   }
 
-  // Мут
   const handleMuteClick = (userId: number, username: string) => {
     setMuteUserId(userId)
     setMuteUsername(username)
@@ -146,7 +179,7 @@ export default function Moderation() {
     try {
       await client.put(`/auth/users/${muteUserId}/mute`, {
         minutes: muteMinutes,
-        reason: muteReason,
+        reason: muteReason.trim(),
       })
       setMuteUserId(null)
       fetchUsers()
@@ -178,22 +211,13 @@ export default function Moderation() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-extrabold text-slate-800">Модерация</h1>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setTab('queue')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${tab === 'queue' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-          >
+          <button onClick={() => setTab('queue')} className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${tab === 'queue' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
             На модерации ({totalInQueue})
           </button>
-          <button
-            onClick={() => setTab('published')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${tab === 'published' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-          >
+          <button onClick={() => setTab('published')} className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${tab === 'published' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
             Каталог
           </button>
-          <button
-            onClick={() => setTab('users')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all flex items-center gap-1.5 ${tab === 'users' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-          >
+          <button onClick={() => setTab('users')} className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all flex items-center gap-1.5 ${tab === 'users' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
             <Shield className="w-4 h-4" /> Пользователи
           </button>
         </div>
@@ -203,7 +227,7 @@ export default function Moderation() {
         <div className="text-center py-20 text-slate-400">Загрузка...</div>
       ) : (
         <>
-          {/* ========== ВКЛАДКА: НА МОДЕРАЦИИ ========== */}
+          {/* Очередь модерации */}
           {tab === 'queue' && (
             <>
               {queue.length === 0 ? (
@@ -240,7 +264,7 @@ export default function Moderation() {
             </>
           )}
 
-          {/* ========== ВКЛАДКА: КАТАЛОГ ========== */}
+          {/* Каталог */}
           {tab === 'published' && (
             <>
               {published.length === 0 ? (
@@ -263,10 +287,7 @@ export default function Moderation() {
                           <td className="px-6 py-4 text-sm text-slate-500 hidden sm:table-cell">{item.creatorUsername}</td>
                           <td className="px-6 py-4 text-sm text-slate-500 hidden md:table-cell">{item.topic}</td>
                           <td className="px-6 py-4">
-                            <button
-                              onClick={() => { setDeleteId(item.id); setDeleteTitle(item.title) }}
-                              className="text-red-500 hover:text-red-700 font-medium text-sm flex items-center gap-1"
-                            >
+                            <button onClick={() => { setDeleteId(item.id); setDeleteTitle(item.title) }} className="text-red-500 hover:text-red-700 font-medium text-sm flex items-center gap-1">
                               <Trash2 className="w-4 h-4" /> Удалить
                             </button>
                           </td>
@@ -280,7 +301,7 @@ export default function Moderation() {
             </>
           )}
 
-          {/* ========== ВКЛАДКА: ПОЛЬЗОВАТЕЛИ ========== */}
+          {/* Пользователи */}
           {tab === 'users' && (
             <>
               {users.length === 0 ? (
@@ -306,15 +327,7 @@ export default function Moderation() {
                               <div className="text-xs text-red-500 mt-0.5">Бан: {u.blockReason}</div>
                             )}
                             {u.muteUntil && new Date(u.muteUntil) > new Date() && (
-                              <div className="text-xs text-amber-600 mt-0.5">
-                                Мут до: {formatDate(u.muteUntil)}
-                                {u.muteReason && ` (${u.muteReason})`}
-                              </div>
-                            )}
-                            {u.lockedUntil && new Date(u.lockedUntil) > new Date() && (
-                              <div className="text-xs text-orange-500 mt-0.5">
-                                Вход заблокирован до: {formatDate(u.lockedUntil)}
-                              </div>
+                              <div className="text-xs text-amber-600 mt-0.5">Мут до: {formatDate(u.muteUntil)}</div>
                             )}
                           </td>
                           <td className="px-6 py-4 text-sm">
@@ -332,27 +345,15 @@ export default function Moderation() {
                           <td className="px-6 py-4 text-sm text-slate-500 hidden md:table-cell">{u.totalCreated}</td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleBlockClick(u.id, u.username, u.isActive)}
-                                className={`p-1.5 rounded-lg transition-colors ${u.isActive ? 'text-red-500 hover:bg-red-50' : 'text-emerald-500 hover:bg-emerald-50'}`}
-                                title={u.isActive ? 'Заблокировать' : 'Разблокировать'}
-                              >
+                              <button onClick={() => handleBlockClick(u.id, u.username, u.isActive)} className={`p-1.5 rounded-lg transition-colors ${u.isActive ? 'text-red-500 hover:bg-red-50' : 'text-emerald-500 hover:bg-emerald-50'}`} title={u.isActive ? 'Заблокировать' : 'Разблокировать'}>
                                 {u.isActive ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                               </button>
                               {u.muteUntil && new Date(u.muteUntil) > new Date() ? (
-                                <button
-                                  onClick={() => handleUnmute(u.id)}
-                                  className="p-1.5 rounded-lg text-emerald-500 hover:bg-emerald-50 transition-colors"
-                                  title="Снять мут"
-                                >
+                                <button onClick={() => handleUnmute(u.id)} className="p-1.5 rounded-lg text-emerald-500 hover:bg-emerald-50 transition-colors" title="Снять мут">
                                   <CheckCircle className="w-4 h-4" />
                                 </button>
                               ) : (
-                                <button
-                                  onClick={() => handleMuteClick(u.id, u.username)}
-                                  className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors"
-                                  title="Запретить публикацию"
-                                >
+                                <button onClick={() => handleMuteClick(u.id, u.username)} className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors" title="Запретить публикацию">
                                   <Clock className="w-4 h-4" />
                                 </button>
                               )}
@@ -372,30 +373,19 @@ export default function Moderation() {
 
       {/* Модалка просмотра филворда */}
       {selectedId && (
-        <ModerationModal
-          fillwordId={selectedId}
-          onClose={() => setSelectedId(null)}
-          onAction={fetchQueue}
-        />
+        <ModerationModal fillwordId={selectedId} onClose={() => setSelectedId(null)} onAction={fetchQueue} />
       )}
 
       {/* Модалка удаления филворда */}
       {deleteId && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setDeleteId(null); setDeleteReason('') }}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold mb-2">Удалить филворд из каталога</h2>
+            <h2 className="text-xl font-bold mb-2">Удалить филворд</h2>
             <p className="text-slate-500 text-sm mb-1"><strong>{deleteTitle}</strong></p>
-            <p className="text-slate-400 text-xs mb-4">Филворд будет скрыт из каталога. Автор увидит причину удаления.</p>
-            <textarea
-              className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-red-400 focus:ring-4 focus:ring-red-50 focus:outline-none resize-none text-sm"
-              rows={3}
-              placeholder="Причина удаления (обязательно)..."
-              value={deleteReason}
-              onChange={(e) => setDeleteReason(e.target.value)}
-            />
+            <textarea className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-red-400 focus:outline-none resize-none text-sm" rows={3} placeholder="Причина удаления..." value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} />
             <div className="flex gap-3 mt-4">
-              <button onClick={() => { setDeleteId(null); setDeleteReason('') }} className="flex-1 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 transition-all">Отмена</button>
-              <button onClick={handleDelete} disabled={!deleteReason.trim()} className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 disabled:opacity-50 transition-all">Удалить</button>
+              <button onClick={() => { setDeleteId(null); setDeleteReason('') }} className="flex-1 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50">Отмена</button>
+              <button onClick={handleDelete} disabled={!deleteReason.trim()} className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 disabled:opacity-50">Удалить</button>
             </div>
           </div>
         </div>
@@ -405,43 +395,17 @@ export default function Moderation() {
       {blockUserId && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setBlockUserId(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold mb-2">
-              {blockAction === 'block' ? 'Заблокировать' : 'Разблокировать'} пользователя
-            </h2>
-            <p className="text-slate-500 text-sm mb-4">
-              Пользователь: <strong>{blockUsername}</strong>
-            </p>
-
+            <h2 className="text-xl font-bold mb-2">{blockAction === 'block' ? 'Заблокировать' : 'Разблокировать'} пользователя</h2>
+            <p className="text-slate-500 text-sm mb-4">Пользователь: <strong>{blockUsername}</strong></p>
             {blockAction === 'block' && (
               <div className="mb-4">
-                <label className="block text-sm font-semibold text-slate-600 mb-1">
-                  Причина блокировки (обязательно)
-                </label>
-                <textarea
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-red-400 focus:ring-4 focus:ring-red-50 focus:outline-none resize-none text-sm"
-                  rows={3}
-                  placeholder="Например: спам, оскорбления, нарушение правил..."
-                  value={blockReason}
-                  onChange={(e) => setBlockReason(e.target.value)}
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  Причина будет показана пользователю при попытке входа
-                </p>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Причина блокировки</label>
+                <textarea className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-red-400 focus:outline-none resize-none text-sm" rows={3} placeholder="Причина..." value={blockReason} onChange={(e) => setBlockReason(e.target.value)} />
               </div>
             )}
-
-            {blockAction === 'unblock' && (
-              <p className="text-sm text-slate-500 mb-4">
-                Пользователь сможет снова войти в систему.
-              </p>
-            )}
-
             <div className="flex gap-3">
-              <button onClick={() => setBlockUserId(null)} className="flex-1 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 transition-all">Отмена</button>
-              <button
-                onClick={confirmBlock}
-                className={`flex-1 px-4 py-2.5 text-white rounded-xl font-semibold transition-all ${blockAction === 'block' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
-              >
+              <button onClick={() => setBlockUserId(null)} className="flex-1 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50">Отмена</button>
+              <button onClick={confirmBlock} className={`flex-1 px-4 py-2.5 text-white rounded-xl font-semibold ${blockAction === 'block' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}>
                 {blockAction === 'block' ? 'Заблокировать' : 'Разблокировать'}
               </button>
             </div>
@@ -454,17 +418,10 @@ export default function Moderation() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setMuteUserId(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-2">Запрет публикации</h2>
-            <p className="text-slate-500 text-sm mb-4">
-              Пользователь: <strong>{muteUsername}</strong>
-            </p>
-
+            <p className="text-slate-500 text-sm mb-4">Пользователь: <strong>{muteUsername}</strong></p>
             <div className="mb-4">
               <label className="block text-sm font-semibold text-slate-600 mb-1">Длительность</label>
-              <select
-                value={muteMinutes}
-                onChange={(e) => setMuteMinutes(parseInt(e.target.value))}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-400 focus:outline-none text-sm bg-white"
-              >
+              <select value={muteMinutes} onChange={(e) => setMuteMinutes(parseInt(e.target.value))} className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-400 focus:outline-none text-sm bg-white">
                 <option value={30}>30 минут</option>
                 <option value={60}>1 час</option>
                 <option value={360}>6 часов</option>
@@ -472,21 +429,13 @@ export default function Moderation() {
                 <option value={10080}>7 дней</option>
               </select>
             </div>
-
             <div className="mb-4">
               <label className="block text-sm font-semibold text-slate-600 mb-1">Причина</label>
-              <textarea
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-400 focus:outline-none resize-none text-sm"
-                rows={2}
-                placeholder="Причина запрета публикации..."
-                value={muteReason}
-                onChange={(e) => setMuteReason(e.target.value)}
-              />
+              <textarea className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-400 focus:outline-none resize-none text-sm" rows={2} placeholder="Причина запрета..." value={muteReason} onChange={(e) => setMuteReason(e.target.value)} />
             </div>
-
             <div className="flex gap-3">
-              <button onClick={() => setMuteUserId(null)} className="flex-1 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 transition-all">Отмена</button>
-              <button onClick={confirmMute} className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-all">Запретить</button>
+              <button onClick={() => setMuteUserId(null)} className="flex-1 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50">Отмена</button>
+              <button onClick={confirmMute} className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600">Запретить</button>
             </div>
           </div>
         </div>

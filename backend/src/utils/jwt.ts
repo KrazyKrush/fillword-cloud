@@ -10,9 +10,13 @@ export interface JwtPayload {
 }
 
 export function generateToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(
+    payload as object,
+    JWT_SECRET as jwt.Secret,
+    { expiresIn: '24h' as const }
+  );
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  return jwt.verify(token, JWT_SECRET as jwt.Secret) as JwtPayload;
 }

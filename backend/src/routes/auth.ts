@@ -5,6 +5,8 @@ import {
   getUserProfile,
   getAllUsers,
   toggleUserBlock,
+  muteUser,
+  unmuteUser,
 } from '../services/auth-service';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
@@ -71,14 +73,21 @@ router.get(
   }
 );
 
+// Блокировка / разблокировка
 router.put(
   '/users/:id/block',
   authenticate,
   requireRole('admin'),
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const { isActive } = req.body;
-      const result = await toggleUserBlock(parseInt(req.params.id), isActive);
+      const { isActive, reason } = req.body;
+      console.log('Block request:', { id: req.params.id, isActive, reason });
+      const result = await toggleUserBlock(
+        parseInt(req.params.id as string),
+        isActive,
+        reason,
+        req.user!.userId
+      );
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -86,7 +95,6 @@ router.put(
   }
 );
 
-// Запрет публикации (mute)
 router.put(
   '/users/:id/mute',
   authenticate,
@@ -94,11 +102,17 @@ router.put(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { minutes, reason } = req.body;
-      if (!minutes || !reason) {
+      console.log('Mute request:', { id: req.params.id, minutes, reason });
+      if (!minutes || !reason || !reason.trim()) {
         res.status(400).json({ error: 'Укажите минуты и причину' });
         return;
       }
-      const result = await muteUser(parseInt(req.params.id), minutes, reason, req.user!.userId);
+      const result = await muteUser(
+        parseInt(req.params.id as string),
+        parseInt(minutes),
+        reason.trim(),
+        req.user!.userId
+      );
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -106,14 +120,13 @@ router.put(
   }
 );
 
-// Снятие запрета публикации
 router.put(
   '/users/:id/unmute',
   authenticate,
   requireRole('admin'),
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const result = await unmuteUser(parseInt(req.params.id));
+      const result = await unmuteUser(parseInt(req.params.id as string));
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

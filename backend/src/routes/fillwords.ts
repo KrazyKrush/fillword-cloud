@@ -1,3 +1,4 @@
+import { getUserProfile } from '../services/auth-service';
 import { Router, Request, Response } from 'express';
 import { authenticate, optionalAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
@@ -59,7 +60,7 @@ router.get(
 
 router.get('/:id', optionalAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const fillword = await getFillwordById(parseInt(req.params.id));
+    const fillword = await getFillwordById(parseInt(req.params.id as string));
     if (fillword.status !== 'published' && (!req.user || req.user.role !== 'admin')) {
       res.status(403).json({ error: 'Филворд недоступен' });
       return;
@@ -83,7 +84,7 @@ router.post(
       }
 
       const data = createFillwordSchema.parse(req.body);
-      const result = await createFillword(req.user!.userId, data);
+      const result = await createFillword(req.user!.userId, data as any);
       res.status(201).json(result);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -101,7 +102,7 @@ router.put(
   requireRole('user', 'admin'),
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const result = await updateFillword(parseInt(req.params.id), req.user!.userId, req.body);
+      const result = await updateFillword(parseInt(req.params.id as string), req.user!.userId, req.body);
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -116,7 +117,7 @@ router.delete(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const isAdmin = req.user!.role === 'admin';
-      const result = await deleteFillword(parseInt(req.params.id), req.user!.userId, isAdmin);
+      const result = await deleteFillword(parseInt(req.params.id as string), req.user!.userId, isAdmin);
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

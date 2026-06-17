@@ -29,7 +29,7 @@ export async function registerUser(username: string, password: string): Promise<
 
 export async function loginUser(username: string, password: string): Promise<any> {
   const user = await prisma.user.findUnique({ where: { username } });
-  
+
   if (!user) throw new Error('Неверное имя пользователя или пароль');
 
   // Проверка временной блокировки за попытки
@@ -45,16 +45,14 @@ export async function loginUser(username: string, password: string): Promise<any
   }
 
   const isPasswordValid: boolean = await bcrypt.compare(password, user.passwordHash);
-  
+
   if (!isPasswordValid) {
-    // Увеличиваем счётчик попыток
     const attempts = user.loginAttempts + 1;
     const updateData: any = { loginAttempts: attempts };
 
-    // После 5 неудачных попыток — блокировка на 15 минут
     if (attempts >= 5) {
       updateData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
-      updateData.loginAttempts = 0; // сбрасываем счётчик
+      updateData.loginAttempts = 0;
     }
 
     await prisma.user.update({ where: { id: user.id }, data: updateData });
@@ -62,11 +60,11 @@ export async function loginUser(username: string, password: string): Promise<any
     if (attempts >= 5) {
       throw new Error('Слишком много попыток. Вход заблокирован на 15 минут.');
     }
-    
+
     throw new Error(`Неверный пароль. Осталось попыток: ${5 - attempts}`);
   }
 
-  // Успешный вход — сбрасываем счётчик
+  // Успешный вход
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -98,7 +96,6 @@ export async function getUserProfile(userId: number): Promise<any> {
 
   if (!user) throw new Error('Пользователь не найден');
 
-  // Проверка запрета публикации
   let muteMessage: string | null = null;
   if (user.muteUntil && new Date(user.muteUntil) > new Date()) {
     const until = new Date(user.muteUntil).toLocaleString('ru-RU');
@@ -129,6 +126,7 @@ export async function getAllUsers(page: number = 1, size: number = 20): Promise<
         username: true,
         role: true,
         isActive: true,
+        blockReason: true,
         muteUntil: true,
         muteReason: true,
         lockedUntil: true,
@@ -149,6 +147,7 @@ export async function getAllUsers(page: number = 1, size: number = 20): Promise<
       username: u.username,
       role: u.role,
       isActive: u.isActive,
+      blockReason: u.blockReason,
       muteUntil: u.muteUntil,
       muteReason: u.muteReason,
       lockedUntil: u.lockedUntil,
@@ -172,11 +171,13 @@ export async function toggleUserBlock(
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('Пользователь не найден');
 
+  const blockReason = isActive ? null : (reason?.trim() || 'Нарушение правил');
+
   await prisma.user.update({
     where: { id: userId },
     data: {
       isActive,
-      blockReason: isActive ? null : (reason || null),
+      blockReason,
       blockedAt: isActive ? null : new Date(),
       blockedById: isActive ? null : (blockedById || null),
       loginAttempts: 0,
@@ -188,7 +189,7 @@ export async function toggleUserBlock(
     id: userId,
     username: user.username,
     isActive,
-    message: isActive ? 'Пользователь разблокирован' : 'Пользователь заблокирован',
+    message: isActive ? 'Пользователь разблокирован' : `Пользователь заблокирован. Причина: ${blockReason}`,
   };
 }
 
@@ -201,13 +202,14 @@ export async function muteUser(
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('Пользователь не найден');
 
+  const muteReason = reason?.trim() || 'Нарушение правил';
   const muteUntil = new Date(Date.now() + minutes * 60 * 1000);
 
   await prisma.user.update({
     where: { id: userId },
     data: {
       muteUntil,
-      muteReason: reason,
+      muteReason,
     },
   });
 
@@ -215,8 +217,8 @@ export async function muteUser(
     id: userId,
     username: user.username,
     muteUntil,
-    muteReason: reason,
-    message: `Пользователю запрещена публикация на ${minutes} мин.`,
+    muteReason,
+    message: `Пользователю запрещена публикация на ${minutes} мин. Причина: ${muteReason}`,
   };
 }
 
