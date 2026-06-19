@@ -5,8 +5,6 @@ import { aiGenerateSchema } from '../utils/validators';
 import { generateWords, checkAiStatus } from '../services/gigachat-service';
 
 const router: Router = Router();
-
-// Публичный маршрут — без авторизации
 router.get('/status', async (req: Request, res: Response): Promise<void> => {
   try {
     const status = await checkAiStatus();
@@ -16,7 +14,6 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// Всё что ниже — требует авторизации
 router.use(authenticate);
 router.use(requireRole('user', 'admin'));
 

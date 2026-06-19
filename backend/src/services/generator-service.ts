@@ -14,16 +14,12 @@ export function randomChar(): string {
   return CYRILLIC[Math.floor(Math.random() * CYRILLIC.length)];
 }
 
-// Все возможные типы дорожек
 export function getDirections(difficulty: string): string[] {
   const base = ['H', 'V', 'D', 'HR', 'VR', 'DR'];
   if (difficulty === 'easy') return [...base, 'ZH', 'ZV'];
   if (difficulty === 'medium') return [...base, 'ZH', 'ZV'];
   return [...base, 'ZH', 'ZV'];
 }
-
-// ZH = горизонтальная змейка (→↓→↓→↓)
-// ZV = вертикальная змейка (↓→↓→↓→)
 
 function buildSnakePath(
   word: string,
@@ -42,11 +38,9 @@ function buildSnakePath(
     let nextCol = col;
 
     if (type === 'ZH') {
-      // Нечётный шаг →, чётный шаг ↓
       if (i % 2 === 1) nextCol = col + 1;
       else nextRow = row + 1;
     } else {
-      // Нечётный шаг ↓, чётный шаг →
       if (i % 2 === 1) nextRow = row + 1;
       else nextCol = col + 1;
     }
@@ -82,14 +76,13 @@ export function canPlaceWord(
   const height = grid.length;
   const width = grid[0].length;
 
-  // Змейки
+
   if (direction === 'ZH' || direction === 'ZV') {
     const path = buildSnakePath(word, startRow, startCol, direction as 'ZH' | 'ZV', height, width);
     if (!path) return false;
     return isSnakePathValid(grid, word, path);
   }
 
-  // Прямые
   let row = startRow;
   let col = startCol;
 
@@ -118,7 +111,7 @@ export function placeWordOnGrid(
   const height = grid.length;
   const width = grid[0].length;
 
-  // Змейки
+
   if (direction === 'ZH' || direction === 'ZV') {
     const path = buildSnakePath(word, startRow, startCol, direction as 'ZH' | 'ZV', height, width);
     if (path) {
@@ -133,7 +126,6 @@ export function placeWordOnGrid(
     return [];
   }
 
-  // Прямые
   const path: Array<{ row: number; col: number }> = [];
   let row = startRow;
   let col = startCol;
@@ -170,7 +162,6 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-// Проверка: можно ли разместить слово с учётом уже размещённых?
 function wouldBreakExisting(
   grid: (string | null)[][],
   word: string,
@@ -179,14 +170,13 @@ function wouldBreakExisting(
   direction: string,
   placedWords: PlacedWord[]
 ): boolean {
-  // Создаём копию сетки и пробуем разместить
   const gridCopy: (string | null)[][] = grid.map(row => [...row]);
   placeWordOnGrid(gridCopy, word, startRow, startCol, direction);
 
-  // Проверяем, что все уже размещённые слова всё ещё читаются
+
   for (const pw of placedWords) {
     if (!canPlaceWord(gridCopy, pw.word, pw.startRow, pw.startCol, pw.direction)) {
-      return true; // сломали существующее слово
+      return true; 
     }
   }
   return false;
@@ -209,7 +199,7 @@ export function generateFillword(
   for (const word of sortedWords) {
     let placed = false;
 
-    // Все возможные позиции
+
     const allPositions: Array<{ row: number; col: number; dir: string }> = [];
     for (let r = 0; r < height; r++) {
       for (let c = 0; c < width; c++) {
@@ -221,23 +211,19 @@ export function generateFillword(
       }
     }
 
-    // Перемешиваем
     const shuffled = shuffle(allPositions);
 
-    // Сортируем: предпочитаем неиспользованные направления и пересечения
     shuffled.sort((a, b) => {
       const aUsed = usedDirections[a.dir] || 0;
       const bUsed = usedDirections[b.dir] || 0;
       if (aUsed !== bUsed) return aUsed - bUsed;
 
-      // Предпочитаем змейки
       const aSnake = a.dir.startsWith('Z') ? 0 : 1;
       const bSnake = b.dir.startsWith('Z') ? 0 : 1;
       return aSnake - bSnake;
     });
 
     for (const pos of shuffled) {
-      // Проверяем, не сломает ли это размещение другие слова
       if (wouldBreakExisting(grid, word, pos.row, pos.col, pos.dir, placedWords)) {
         continue;
       }
@@ -269,7 +255,6 @@ export function generateFillword(
     }
   }
 
-  // Заполняем пустые ячейки
   const finalGrid: string[][] = grid.map(row => row.map(cell => cell || randomChar()));
   return { grid: finalGrid, placedWords };
 }

@@ -138,7 +138,6 @@ export async function createFillword(
             endCol: w.endCol,
           };
           
-          // Сохраняем путь для змеек
           if (w.path && w.path.length > 0) {
             wordData.path = {
               create: w.path.map((p: any, step: number) => ({
@@ -186,7 +185,6 @@ export async function updateFillword(
 
     const difficulty = calculateDifficulty(width, height, result.placedWords.length);
 
-    // Удаляем старые ячейки и слова
     await prisma.gridCell.deleteMany({ where: { fillwordId } });
     await prisma.word.deleteMany({ where: { fillwordId } });
 
@@ -218,7 +216,6 @@ export async function updateFillword(
               endCol: w.endCol,
             };
             
-            // Сохраняем путь для змеек
             if (w.path && w.path.length > 0) {
               wordData.path = {
                 create: w.path.map((p: any, step: number) => ({

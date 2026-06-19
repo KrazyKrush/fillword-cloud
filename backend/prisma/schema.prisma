@@ -41,7 +41,7 @@ model Fillword {
   difficulty       String    @default("easy")
   status           String    @default("pending")
   rejectionReason  String?
-  deletedReason    String?   // НОВОЕ ПОЛЕ: причина удаления админом
+  deletedReason    String?  
   isAiGenerated    Boolean   @default(false)
   totalWordsCount  Int
   createdAt        DateTime  @default(now())

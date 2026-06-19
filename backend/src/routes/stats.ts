@@ -17,7 +17,6 @@ router.get('/platform', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// Топ решателей по количеству
 router.get('/top-solvers', async (req: Request, res: Response): Promise<void> => {
   try {
     const period = (req.query.period as string) || 'all';
@@ -62,7 +61,6 @@ router.get('/top-solvers', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-// Топ решателей по скорости
 router.get('/top-speed', async (req: Request, res: Response): Promise<void> => {
   try {
     const difficulty = (req.query.difficulty as string) || 'easy';
@@ -81,7 +79,6 @@ router.get('/top-speed', async (req: Request, res: Response): Promise<void> => {
       take: 100,
     });
 
-    // Убираем дубликаты пользователей (лучший результат)
     const seen = new Set<number>();
     const unique: typeof results = [];
     for (const r of results) {

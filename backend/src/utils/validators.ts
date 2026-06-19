@@ -20,11 +20,13 @@ export const createFillwordSchema = z.object({
 });
 
 export const checkWordSchema = z.object({
-  word: z.string().min(1),
-  cells: z.array(z.object({
-    row: z.number().int().min(0),
-    col: z.number().int().min(0),
-  })).min(1),
+  word: z.string().min(1, 'Введите слово'),
+  cells: z.array(
+    z.object({
+      row: z.number().int().min(0),
+      col: z.number().int().min(0),
+    })
+  ).min(1, 'Выделите хотя бы одну ячейку'),
 });
 
 export const rejectSchema = z.object({

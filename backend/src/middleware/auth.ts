@@ -37,7 +37,6 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
       const decoded: JwtPayload = verifyToken(token);
       req.user = decoded;
     } catch (error) {
-      // Игнорируем ошибки для опциональной аутентификации
     }
   }
 

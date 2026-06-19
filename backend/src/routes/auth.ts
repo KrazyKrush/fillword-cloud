@@ -73,7 +73,6 @@ router.get(
   }
 );
 
-// Блокировка / разблокировка
 router.put(
   '/users/:id/block',
   authenticate,

@@ -28,17 +28,28 @@ export async function registerUser(username: string, password: string): Promise<
 }
 
 export async function loginUser(username: string, password: string): Promise<any> {
-  const user = await prisma.user.findUnique({ where: { username } });
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: {
+      id: true,
+      username: true,
+      passwordHash: true,
+      role: true,
+      isActive: true,
+      blockReason: true,
+      loginAttempts: true,
+      lockedUntil: true,
+      lastLoginAt: true,
+    },
+  });
 
   if (!user) throw new Error('Неверное имя пользователя или пароль');
 
-  // Проверка временной блокировки за попытки
   if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
     const minutes = Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000);
     throw new Error(`Вход временно заблокирован. Попробуйте через ${minutes} мин.`);
   }
 
-  // Проверка бана
   if (!user.isActive) {
     const reason = user.blockReason || 'Нарушение правил';
     throw new Error(`Аккаунт заблокирован. Причина: ${reason}`);
@@ -64,14 +75,9 @@ export async function loginUser(username: string, password: string): Promise<any
     throw new Error(`Неверный пароль. Осталось попыток: ${5 - attempts}`);
   }
 
-  // Успешный вход
   await prisma.user.update({
     where: { id: user.id },
-    data: {
-      loginAttempts: 0,
-      lockedUntil: null,
-      lastLoginAt: new Date(),
-    },
+    data: { loginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
   });
 
   const token: string = generateToken({ userId: user.id, username: user.username, role: user.role });
@@ -89,7 +95,15 @@ export async function loginUser(username: string, password: string): Promise<any
 export async function getUserProfile(userId: number): Promise<any> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: {
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      isActive: true,
+      registeredAt: true,
+      lastLoginAt: true,
+      muteUntil: true,
+      muteReason: true,
       _count: { select: { createdFillwords: true, solveResults: true, achievements: true } },
     },
   });
@@ -168,7 +182,10 @@ export async function toggleUserBlock(
   reason?: string,
   blockedById?: number
 ): Promise<any> {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, username: true },
+  });
   if (!user) throw new Error('Пользователь не найден');
 
   const blockReason = isActive ? null : (reason?.trim() || 'Нарушение правил');
@@ -199,7 +216,10 @@ export async function muteUser(
   reason: string,
   adminId: number
 ): Promise<any> {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, username: true },
+  });
   if (!user) throw new Error('Пользователь не найден');
 
   const muteReason = reason?.trim() || 'Нарушение правил';
@@ -207,10 +227,7 @@ export async function muteUser(
 
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      muteUntil,
-      muteReason,
-    },
+    data: { muteUntil, muteReason },
   });
 
   return {
@@ -223,15 +240,15 @@ export async function muteUser(
 }
 
 export async function unmuteUser(userId: number): Promise<any> {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, username: true },
+  });
   if (!user) throw new Error('Пользователь не найден');
 
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      muteUntil: null,
-      muteReason: null,
-    },
+    data: { muteUntil: null, muteReason: null },
   });
 
   return {

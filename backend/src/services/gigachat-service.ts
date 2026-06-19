@@ -6,7 +6,6 @@ const GIGACHAT_CLIENT_ID: string = process.env.GIGACHAT_CLIENT_ID || '';
 const GIGACHAT_CLIENT_SECRET: string = process.env.GIGACHAT_CLIENT_SECRET || '';
 const GIGACHAT_TIMEOUT_MS: number = parseInt(process.env.GIGACHAT_TIMEOUT_MS || '30000', 10);
 
-// Агент для обхода проблем с сертификатами
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false,
 });
@@ -78,21 +77,18 @@ export async function generateWords(topic: string, count: number = 12): Promise<
     return { words: [], isFallback: true, message: 'Тема не указана', generatedBy: 'local' };
   }
 
-  // Проверяем локальный словарь
   const localWords = findLocalWords(topic, count);
   if (localWords.length >= 5) {
     console.log(`[GigaChat] Найдены слова в локальном словаре по теме "${topic}"`);
     return { words: localWords.slice(0, count), isFallback: false, generatedBy: 'local' };
   }
 
-  // Если ключи не настроены
   if (!GIGACHAT_CLIENT_ID || !GIGACHAT_CLIENT_SECRET) {
     console.log('[GigaChat] Ключи не настроены');
     return generateFallback(topic, count);
   }
 
   try {
-    // Шаг 1: Получаем токен
     console.log('[GigaChat] Получаю токен...');
     const credentials = Buffer.from(`${GIGACHAT_CLIENT_ID}:${GIGACHAT_CLIENT_SECRET}`).toString('base64');
 
@@ -104,7 +100,6 @@ export async function generateWords(topic: string, count: number = 12): Promise<
         'RqUID': crypto.randomUUID(),
       },
       body: 'grant_type=client_credentials&scope=GIGACHAT_API_PERS',
-      // @ts-ignore
       agent: httpsAgent,
     });
 
@@ -114,8 +109,8 @@ export async function generateWords(topic: string, count: number = 12): Promise<
       return generateFallback(topic, count);
     }
 
-    const authData = await authResponse.json();
-    const accessToken = authData.access_token;
+    const authData: any = await authResponse.json();
+    const accessToken: string = authData.access_token;
 
     if (!accessToken) {
       console.log('[GigaChat] Токен не получен');
@@ -124,7 +119,6 @@ export async function generateWords(topic: string, count: number = 12): Promise<
 
     console.log('[GigaChat] Токен получен');
 
-    // Шаг 2: Запрос к GigaChat
     console.log(`[GigaChat] Запрашиваю ${count} слов по теме "${topic}"...`);
 
     const userMessage = `Сгенерируй ${count} слов по теме "${topic}".`;
@@ -151,7 +145,6 @@ export async function generateWords(topic: string, count: number = 12): Promise<
         stream: false,
       }),
       signal: controller.signal,
-      // @ts-ignore
       agent: httpsAgent,
     });
 
@@ -163,11 +156,11 @@ export async function generateWords(topic: string, count: number = 12): Promise<
       return generateFallback(topic, count);
     }
 
-    const chatData = await chatResponse.json();
+    const chatData: any = await chatResponse.json();  
     console.log('[GigaChat] Ответ получен');
 
-    // Шаг 3: Парсим ответ
-    const content = chatData?.choices?.[0]?.message?.content || '';
+    
+    const content: string = chatData?.choices?.[0]?.message?.content || '';
     console.log('[GigaChat] Ответ:', content.substring(0, 200));
 
     const words = content
@@ -261,7 +254,6 @@ export async function checkAiStatus(): Promise<{ isAvailable: boolean; responseT
         'RqUID': crypto.randomUUID(),
       },
       body: 'grant_type=client_credentials&scope=GIGACHAT_API_PERS',
-      // @ts-ignore
       agent: httpsAgent,
     });
 
